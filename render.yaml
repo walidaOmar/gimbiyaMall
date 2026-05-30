@@ -3,7 +3,7 @@ services:
     name: gimbiya-mall-backend
     env: node
     plan: standard
-    rootDir: backend
+    rootDir: server
     buildCommand: pnpm install && pnpm build
     startCommand: pnpm start
     envVars:
@@ -22,4 +22,3 @@ services:
       - key: CORS_ORIGIN
         sync: false
     healthCheckPath: /
-    maxInstances: 3
