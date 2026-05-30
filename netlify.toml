@@ -1,5 +1,5 @@
 [build]
-  base = "frontend"
+  base = "client"
   command = "pnpm install && pnpm build"
   publish = "dist"
 
