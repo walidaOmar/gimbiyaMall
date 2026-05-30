@@ -1,0 +1,13 @@
+diff --git a/src/unstable-core-do-not-import/http/contentType.ts b/src/unstable-core-do-not-import/http/contentType.ts
+index original..fixed
+--- a/src/unstable-core-do-not-import/http/contentType.ts
++++ b/src/unstable-core-do-not-import/http/contentType.ts
+@@ -110,7 +110,7 @@ const jsonContentTypeHandler: ContentTypeHandler = {
+       }
+       const acc: InputRecord = emptyObject();
+       for (const index of paths.keys()) {
+-        const input = inputs[index];
++        const input = inputs[String(index)];
+         if (input !== undefined) {
+           acc[index] =
+             opts.router._def._config.transformer.input.deserialize(input);
