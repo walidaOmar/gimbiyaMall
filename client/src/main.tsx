@@ -23,10 +23,13 @@ const queryClient = new QueryClient({
   },
 });
 
+// Get API URL from environment variable or use relative path for local dev
+const apiUrl = import.meta.env.VITE_API_URL || "/api/trpc";
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: apiUrl,
       transformer: superjson,
       headers: async () => {
         const currentUser = firebaseAuth.currentUser;

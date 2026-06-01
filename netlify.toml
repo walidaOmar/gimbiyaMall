@@ -7,10 +7,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-# Optional proxy for API calls to Render backend. Replace with your backend URL.
-[[redirects]]
-  from = "/api/*"
-  to = "https://YOUR_RENDER_BACKEND.onrender.com/:splat"
-  status = 200
-  force = true
