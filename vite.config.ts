@@ -50,7 +50,7 @@ export default defineConfig({
   envDir:    path.resolve(__dirname),           // .env lives at project root
 
   build: {
-    outDir:      path.resolve(__dirname, "dist/public"),
+    outDir:      "dist/public",
     emptyOutDir: true,
   },
 

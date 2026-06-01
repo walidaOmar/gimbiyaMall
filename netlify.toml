@@ -1,4 +1,5 @@
 [build]
+  base = "client"
   command = "pnpm install && pnpm build"
   publish = "dist/public"
 
