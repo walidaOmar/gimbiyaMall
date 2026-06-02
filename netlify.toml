@@ -3,6 +3,13 @@
   command = "pnpm install && pnpm build"
   publish = "dist/public"
 
+# API proxy rule - forward /api/* requests to Railway backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://gimbiya-mall-backend-production.up.railway.app/api/:splat"
+  status = 200
+
+# Frontend fallback rule - serve index.html for all other routes
 [[redirects]]
   from = "/*"
   to = "/index.html"
