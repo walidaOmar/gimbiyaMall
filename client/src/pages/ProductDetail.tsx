@@ -13,6 +13,8 @@ export default function ProductDetail() {
 
   const { data: product, isLoading } = trpc.products.detail.useQuery({ id: productId });
 
+  console.log("trpc.products.detail -> product:", product);
+
   const savings = useMemo(() => {
     if (!product) return 0;
     return Math.max(0, product.baseSalePrice - product.finalPrice);

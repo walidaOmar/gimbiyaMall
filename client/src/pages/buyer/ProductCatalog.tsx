@@ -24,6 +24,24 @@ export default function ProductCatalog() {
   });
   const { data: featuredProducts } = trpc.products.featured.useQuery();
 
+  // Debug logs to inspect what the client actually receives from the API
+  console.log("trpc.products.list -> products:", products);
+  console.log("trpc.products.featured -> featuredProducts:", featuredProducts);
+
+  // Normalize Mongoose `_id` to `id` and ensure numeric fields are present
+  const productsNormalized = (products ?? []).map((p: any) => ({
+    ...p,
+    id: (p.id ?? p._id) && String(p.id ?? p._id),
+    finalPrice: p.finalPrice ?? p.baseSalePrice ?? 0,
+    stockQuantity: p.stockQuantity ?? 0,
+  }));
+
+  const featuredNormalized = (featuredProducts ?? []).map((p: any) => ({
+    ...p,
+    id: (p.id ?? p._id) && String(p.id ?? p._id),
+    finalPrice: p.finalPrice ?? p.baseSalePrice ?? 0,
+  }));
+
   const addToCartMutation = trpc.cart.add.useMutation({
     onSuccess: () => {
       toast.success("Product added to cart!");
@@ -105,12 +123,12 @@ export default function ProductCatalog() {
       </div>
 
       {/* Featured Products Section */}
-      {featuredProducts && featuredProducts.length > 0 && (
+      {featuredNormalized && featuredNormalized.length > 0 && (
         <section className="bg-white border-b py-8">
           <div className="container mx-auto px-4">
             <h2 className="text-2xl font-bold mb-6 text-slate-900">Featured Products</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredProducts.map((product) => (
+              {featuredNormalized.map((product) => (
                 <Card
                   key={product.id}
                   className="hover:shadow-lg transition-shadow cursor-pointer group"
@@ -164,11 +182,11 @@ export default function ProductCatalog() {
       <section className="container mx-auto px-4 py-12">
         <h2 className="text-2xl font-bold mb-6 text-slate-900">All Products</h2>
 
-        {isLoading ? (
+            {isLoading ? (
           <ProductCatalogSkeleton />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products?.map((product) => (
+            {productsNormalized.map((product) => (
               <Card
                 key={product.id}
                 className="hover:shadow-lg transition-shadow cursor-pointer group"
@@ -217,7 +235,7 @@ export default function ProductCatalog() {
           </div>
         )}
 
-        {products && products.length === 0 && (
+        {productsNormalized && productsNormalized.length === 0 && (
           <div className="text-center py-12">
             <p className="text-slate-600 text-lg">No products found</p>
           </div>

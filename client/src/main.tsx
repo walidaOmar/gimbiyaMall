@@ -31,15 +31,19 @@ const trpcClient = trpc.createClient({
     httpBatchLink({
       url: apiUrl,
       transformer: superjson,
-      headers: async () => {
-        const currentUser = firebaseAuth.currentUser;
-        if (!currentUser) return {};
-        const token = await currentUser.getIdToken();
-        return { authorization: `Bearer ${token}` };
-      },
+        // Include credentials so cookie-based sessions work (Set-Cookie / HttpOnly)
+        fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
+        headers: async () => {
+          const currentUser = firebaseAuth.currentUser;
+          if (!currentUser) return {};
+          const token = await currentUser.getIdToken();
+          return { authorization: `Bearer ${token}` };
+        },
     }),
   ],
 });
+
+console.log("trpc apiUrl:", apiUrl);
 
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>

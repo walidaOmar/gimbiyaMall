@@ -18,6 +18,8 @@ export default function StoreDetail() {
     { enabled: !!id }
   );
 
+  console.log("trpc.stores.detail -> store:", store);
+
   if (isLoading) return <div className="flex justify-center items-center h-screen">Loading store...</div>;
   if (!store) return <div className="text-center py-12">Store not found</div>;
 
