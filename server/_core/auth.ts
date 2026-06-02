@@ -77,10 +77,15 @@ export function getSessionCookieOptions(req: Request) {
   const isProduction = process.env.NODE_ENV === "production";
   const isSecure = isProduction || req.protocol === "https" || req.headers["x-forwarded-proto"] === "https";
 
+  // For cross-origin deployments (Netlify frontend + Railway backend) we must
+  // set SameSite='none' and secure=true so the browser will accept and send
+  // the session cookie across origins. In non-secure dev, fall back to 'lax'.
+  const sameSite: "none" | "lax" = isSecure ? "none" : "lax";
+
   return {
     httpOnly: true,
     secure: isSecure,
-    sameSite: (isSecure ? "strict" : "lax") as "strict" | "lax",
+    sameSite,
     maxAge: ONE_YEAR_MS,
     path: "/",
   };

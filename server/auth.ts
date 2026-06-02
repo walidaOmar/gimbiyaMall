@@ -58,8 +58,9 @@ export const authRouter = router({
   me: publicProcedure.query(async ({ ctx }) => {
     if (!ctx.user) return null;
 
+    const start = Date.now();
     // Return safe user object (passwordHash is select:false, so not included)
-    return {
+    const userObj = {
       _id:          ctx.user._id.toString(),
       name:         ctx.user.name,
       email:        ctx.user.email,
@@ -75,6 +76,9 @@ export const authRouter = router({
       createdAt:    ctx.user.createdAt?.toISOString() ?? null,
       updatedAt:    ctx.user.updatedAt?.toISOString() ?? null,
     };
+    const duration = Date.now() - start;
+    console.log(`auth.me: returning user ${ctx.user._id?.toString?.() ?? 'unknown'} in ${duration}ms`);
+    return userObj;
   }),
 
   /**

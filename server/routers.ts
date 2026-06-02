@@ -127,9 +127,13 @@ export const appRouter = router({
   stores: router({
     list: publicProcedure
       .input(paginationInput)
-      .query(async ({ input }) =>
-        Store.find({ isActive: true }).populate('products').skip(input.offset).limit(input.limit).lean()
-      ),
+      .query(async ({ input }) => {
+        const start = Date.now();
+        const results = await Store.find({ isActive: true }).skip(input.offset).limit(input.limit).lean();
+        const duration = Date.now() - start;
+        console.log(`stores.list: returned ${results.length} stores in ${duration}ms`);
+        return results;
+      }),
     detail: publicProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ input }) => {
