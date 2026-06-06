@@ -16,6 +16,9 @@ export async function createContext(
 
   try {
     const token = getSessionToken(opts.req);
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("createContext: session cookie present?", !!token);
+    }
     const session = await verifySessionToken(token);
 
     if (session?.userId) {
@@ -36,6 +39,7 @@ export async function createContext(
           : undefined;
 
       if (bearerToken) {
+        if (process.env.NODE_ENV !== "production") console.debug("createContext: bearer token present");
         const firebasePayload = await verifyFirebaseIdToken(bearerToken);
         if (firebasePayload?.email) {
           user = await User.findOne({

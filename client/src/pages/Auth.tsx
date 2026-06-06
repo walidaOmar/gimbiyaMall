@@ -17,18 +17,13 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { firebaseAuth } from "@/lib/firebase";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
 import {
   ShoppingBag, Mail, Lock, User, Phone,
   Eye, EyeOff, CheckCircle2, Shield, Truck,
   Settings, Code2, AlertCircle, ArrowLeft, Zap, Package,
 } from "lucide-react";
 
-type AuthMode = "login" | "signup" | "staff";
+type AuthMode = "login" | "signup";
 
 // ── Role → Dashboard path ─────────────────────────────────────────────────────
 function getRoleRedirect(role: string): string {
@@ -44,60 +39,6 @@ function getRoleRedirect(role: string): string {
   return map[role] ?? "/mall";
 }
 
-// ── Staff quick-login cards ───────────────────────────────────────────────────
-// FIX: Stock Manager uses stock@sahadstores.com (not manager@)
-const STAFF_CARDS = [
-  {
-    role: "Admin",
-    email: "admin@sahadstores.com",
-    password: "Admin@123456",
-    desc: "Full platform control",
-    icon: Shield,
-    accent: "#ef4444",
-    bg: "rgba(239,68,68,0.08)",
-    border: "rgba(239,68,68,0.2)",
-  },
-  {
-    role: "Manager",
-    email: "manager@sahadstores.com",
-    password: "Manager@123456",
-    desc: "Products & inventory",
-    icon: Settings,
-    accent: "#3b82f6",
-    bg: "rgba(59,130,246,0.08)",
-    border: "rgba(59,130,246,0.2)",
-  },
-  {
-    role: "Stock Manager",
-    email: "stock@sahadstores.com",      // ← FIXED (was manager@)
-    password: "Stock@123456",
-    desc: "Stock levels & restocks",
-    icon: Package,
-    accent: "#10b981",
-    bg: "rgba(16,185,129,0.08)",
-    border: "rgba(16,185,129,0.2)",
-  },
-  {
-    role: "Delivery",
-    email: "delivery@sahadstores.com",
-    password: "Delivery@123456",
-    desc: "Orders & tracking",
-    icon: Truck,
-    accent: "#f59e0b",
-    bg: "rgba(245,158,11,0.08)",
-    border: "rgba(245,158,11,0.2)",
-  },
-  {
-    role: "Developer",
-    email: "developer@sahadstores.com",
-    password: "Developer@123456",
-    desc: "Platform analytics",
-    icon: Code2,
-    accent: "#a855f7",
-    bg: "rgba(168,85,247,0.08)",
-    border: "rgba(168,85,247,0.2)",
-  },
-] as const;
 
 // ── Shared input styles ───────────────────────────────────────────────────────
 const inp: React.CSSProperties = {
@@ -130,9 +71,7 @@ export default function Auth() {
   const search = useSearch();
   const urlMode = new URLSearchParams(search).get("mode");
 
-  const [mode, setMode] = useState<AuthMode>(
-    urlMode === "signup" ? "signup" : urlMode === "staff" ? "staff" : "login"
-  );
+  const [mode, setMode] = useState<AuthMode>(urlMode === "signup" ? "signup" : "login");
 
   // If already logged in, redirect to correct dashboard
   useEffect(() => {
@@ -153,9 +92,7 @@ export default function Auth() {
   const [signupConfirm, setSignupConfirm] = useState("");
   const [showSignupPw, setShowSignupPw]   = useState(false);
 
-  const [staffEmail, setStaffEmail]       = useState("");
-  const [staffPw, setStaffPw]             = useState("");
-  const [showStaffPw, setShowStaffPw]     = useState(false);
+  
 
   // ── tRPC mutations ──────────────────────────────────────────────────────────
 
@@ -174,30 +111,35 @@ export default function Auth() {
     onError: (e) => toast.error(e.message || "Firebase login failed"),
   });
 
-  /**
-   * STAFF LOGIN
-   * FIX: stock_manager is now included in the allowed roles check server-side.
-   */
-  const loginStaff = trpc.auth.loginStaff.useMutation({
+  const loginUnified = trpc.auth.loginUnified.useMutation({
     onSuccess: (d) => {
-      toast.success(`Signed in as ${d.role}`);
-      setUser(null); // triggers refetch
-      setTimeout(() => navigate(getRoleRedirect(d.role)), 600);
+      toast.success("Signed in successfully.");
+      setUser(null);
+      setTimeout(() => navigate(getRoleRedirect(d.role)), 500);
     },
     onError: (e) => toast.error(e.message || "Login failed"),
   });
+
+  const signupBuyer = trpc.auth.signupBuyer.useMutation({
+    onSuccess: () => {
+      toast.success("Account created successfully.");
+      setUser(null);
+      setTimeout(() => navigate(getRoleRedirect("buyer")), 600);
+    },
+    onError: (e) => toast.error(e.message || "Signup failed"),
+  });
+
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmail || !loginPw) return toast.error("Please fill all fields");
-
     try {
-      await signInWithEmailAndPassword(firebaseAuth, loginEmail, loginPw);
-      const idToken = await firebaseAuth.currentUser?.getIdToken();
-      if (!idToken) throw new Error("Unable to retrieve Firebase token.");
-      firebaseLogin.mutate({ idToken });
+      loginUnified.mutate({
+        email: loginEmail.trim().toLowerCase(),
+        password: loginPw,
+      });
     } catch (err: any) {
       toast.error(err?.message || "Login failed");
     }
@@ -209,26 +151,23 @@ export default function Auth() {
       return toast.error("Fill all required fields");
     }
     if (signupPw !== signupConfirm) return toast.error("Passwords don't match");
-
     try {
-      await createUserWithEmailAndPassword(firebaseAuth, signupEmail, signupPw);
-      const idToken = await firebaseAuth.currentUser?.getIdToken();
-      if (!idToken) throw new Error("Unable to retrieve Firebase token.");
-      firebaseLogin.mutate({ idToken });
+      await signupBuyer.mutateAsync({
+        name: signupName.trim(),
+        email: signupEmail.trim().toLowerCase(),
+        phone: signupPhone.trim() || undefined,
+        password: signupPw,
+        confirmPassword: signupConfirm,
+      });
     } catch (err: any) {
       toast.error(err?.message || "Signup failed");
     }
   };
 
-  const handleStaffLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!staffEmail || !staffPw) return toast.error("Enter email and password");
-    loginStaff.mutate({ email: staffEmail, password: staffPw });
-  };
 
   const pwMatch    = signupConfirm.length > 0 && signupConfirm === signupPw;
   const pwMismatch = signupConfirm.length > 0 && signupConfirm !== signupPw;
-  const isPending  = firebaseLogin.isPending || loginStaff.isPending;
+  const isPending  = loginUnified.isPending || firebaseLogin.isPending || signupBuyer.isPending;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -339,7 +278,7 @@ export default function Auth() {
           padding: "40px 24px",
         }}
       >
-        <div style={{ width: "100%", maxWidth: mode === "staff" ? 900 : 440 }}>
+        <div style={{ width: "100%", maxWidth: 440 }}>
 
           {/* Tab switcher */}
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 36 }}>
@@ -353,7 +292,7 @@ export default function Auth() {
                 border: "1px solid rgba(255,255,255,0.07)",
               }}
             >
-              {(["login", "signup", "staff"] as AuthMode[]).map((m) => (
+              {( ["login", "signup"] as AuthMode[]).map((m) => (
                 <button
                   key={m}
                   onClick={() => setMode(m)}
@@ -366,19 +305,11 @@ export default function Auth() {
                     border: "none",
                     fontFamily: "inherit",
                     transition: "all 0.2s",
-                    background:
-                      mode === m
-                        ? m === "staff"
-                          ? "rgba(255,255,255,0.1)"
-                          : "linear-gradient(135deg,#e8a020,#f5c842)"
-                        : "transparent",
-                    color:
-                      mode === m
-                        ? m === "staff" ? "#fff" : "#0b1628"
-                        : "rgba(255,255,255,0.4)",
+                    background: mode === m ? "linear-gradient(135deg,#e8a020,#f5c842)" : "transparent",
+                    color: mode === m ? "#0b1628" : "rgba(255,255,255,0.4)",
                   }}
                 >
-                  {m === "login" ? "Sign In" : m === "signup" ? "Sign Up" : "Staff Portal"}
+                  {m === "login" ? "Sign In" : "Sign Up"}
                 </button>
               ))}
             </div>
@@ -794,258 +725,7 @@ export default function Auth() {
             </div>
           )}
 
-          {/* ── STAFF PORTAL ─────────────────────────────────────────────────── */}
-          {mode === "staff" && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-                gap: 24,
-              }}
-            >
-              {/* Staff login form */}
-              <div
-                style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 18,
-                  padding: 28,
-                }}
-              >
-                <h2 style={{ color: "#fff", fontSize: 20, fontWeight: 700, marginBottom: 4 }}>
-                  Staff Login
-                </h2>
-                <p
-                  style={{
-                    color: "rgba(255,255,255,0.35)",
-                    fontSize: 13,
-                    marginBottom: 24,
-                  }}
-                >
-                  Admin · Manager · Stock · Delivery · Developer
-                </p>
-
-                <form
-                  onSubmit={handleStaffLogin}
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
-                >
-                  <div>
-                    <label style={lbl}>Email address</label>
-                    <div style={{ position: "relative" }}>
-                      <Mail
-                        size={15}
-                        style={{
-                          position: "absolute",
-                          left: 13,
-                          top: 13,
-                          color: "rgba(255,255,255,0.3)",
-                          pointerEvents: "none",
-                        }}
-                      />
-                      <input
-                        type="email"
-                        value={staffEmail}
-                        onChange={(e) => setStaffEmail(e.target.value)}
-                        placeholder="admin@sahadstores.com"
-                        style={inp}
-                        onFocus={(e) => (e.target.style.borderColor = "rgba(232,160,32,0.6)")}
-                        onBlur={(e)  => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={lbl}>Password</label>
-                    <div style={{ position: "relative" }}>
-                      <Lock
-                        size={15}
-                        style={{
-                          position: "absolute",
-                          left: 13,
-                          top: 13,
-                          color: "rgba(255,255,255,0.3)",
-                          pointerEvents: "none",
-                        }}
-                      />
-                      <input
-                        type={showStaffPw ? "text" : "password"}
-                        value={staffPw}
-                        onChange={(e) => setStaffPw(e.target.value)}
-                        placeholder="Your password"
-                        style={{ ...inp, paddingRight: 44 }}
-                        onFocus={(e) => (e.target.style.borderColor = "rgba(232,160,32,0.6)")}
-                        onBlur={(e)  => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowStaffPw(!showStaffPw)}
-                        style={{
-                          position: "absolute",
-                          right: 13,
-                          top: 13,
-                          color: "rgba(255,255,255,0.3)",
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {showStaffPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loginStaff.isPending}
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      borderRadius: 10,
-                      fontSize: 14,
-                      fontWeight: 700,
-                      background: "rgba(255,255,255,0.08)",
-                      color: "#fff",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      cursor: loginStaff.isPending ? "not-allowed" : "pointer",
-                      opacity: loginStaff.isPending ? 0.7 : 1,
-                      fontFamily: "inherit",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {loginStaff.isPending ? "Signing in…" : "Sign In as Staff"}
-                  </button>
-                </form>
-              </div>
-
-              {/* Quick-login cards */}
-              <div>
-                <p
-                  style={{
-                    color: "rgba(255,255,255,0.3)",
-                    fontSize: 13,
-                    marginBottom: 14,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <Zap size={13} color="#e8a020" /> Click any card for instant one-click login
-                </p>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 10,
-                  }}
-                >
-                  {STAFF_CARDS.map((c) => {
-                    const Icon = c.icon;
-                    return (
-                      <button
-                        key={c.role}
-                        onClick={() =>
-                          loginStaff.mutate({ email: c.email, password: c.password })
-                        }
-                        disabled={loginStaff.isPending}
-                        style={{
-                          padding: 16,
-                          borderRadius: 14,
-                          border: `1.5px solid ${c.border}`,
-                          background: c.bg,
-                          textAlign: "left",
-                          cursor: loginStaff.isPending ? "not-allowed" : "pointer",
-                          transition: "all 0.2s",
-                          opacity: loginStaff.isPending ? 0.6 : 1,
-                          fontFamily: "inherit",
-                        }}
-                        onMouseOver={(e) => {
-                          if (!loginStaff.isPending) {
-                            e.currentTarget.style.transform = "translateY(-2px)";
-                            e.currentTarget.style.boxShadow = `0 8px 24px ${c.accent}30`;
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginBottom: 8,
-                          }}
-                        >
-                          <span
-                            style={{
-                              background: `${c.accent}22`,
-                              color: c.accent,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              padding: "3px 10px",
-                              borderRadius: 99,
-                            }}
-                          >
-                            {c.role}
-                          </span>
-                          <Icon size={14} color={c.accent} style={{ opacity: 0.6 }} />
-                        </div>
-                        <p
-                          style={{
-                            color: "rgba(255,255,255,0.45)",
-                            fontSize: 12,
-                            marginBottom: 6,
-                          }}
-                        >
-                          {c.desc}
-                        </p>
-                        <p
-                          style={{
-                            fontFamily: "monospace",
-                            fontSize: 10,
-                            color: "rgba(255,255,255,0.25)",
-                          }}
-                        >
-                          {c.email}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 14,
-                    padding: "12px 16px",
-                    background: "rgba(232,160,32,0.06)",
-                    border: "1px solid rgba(232,160,32,0.15)",
-                    borderRadius: 12,
-                    display: "flex",
-                    gap: 10,
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <AlertCircle
-                    size={15}
-                    color="#e8a020"
-                    style={{ flexShrink: 0, marginTop: 1 }}
-                  />
-                  <p
-                    style={{
-                      color: "rgba(255,255,255,0.4)",
-                      fontSize: 12,
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    Staff accounts are seeded automatically when the server starts with MongoDB
-                    connected. Each role has distinct permissions — explore each dashboard freely.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Staff portal removed — unified Sign-In/Sign-Up only */}
         </div>
       </div>
 

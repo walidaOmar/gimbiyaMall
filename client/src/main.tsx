@@ -24,21 +24,49 @@ const queryClient = new QueryClient({
 });
 
 // Get API URL from environment variable or use relative path for local dev
-const apiUrl = import.meta.env.VITE_API_URL || "/api/trpc";
+const deriveCodespaceApiUrl = () => {
+  if (typeof window === "undefined") return null;
+
+  const host = window.location.host;
+  const isGithubDev = host.endsWith(".app.github.dev") || host.endsWith(".github.dev");
+  if (!isGithubDev) return null;
+
+  const match = host.match(/^(.*)-3000(\.app\.github\.dev|\.github\.dev)$/);
+  if (!match) return null;
+
+  return `${window.location.protocol}//${match[1]}-3001${match[2]}/api/trpc`;
+};
+
+const apiUrl =
+  import.meta.env.VITE_API_URL ||
+  deriveCodespaceApiUrl() ||
+  "/api/trpc";
+
+if (import.meta.env.PROD && apiUrl.startsWith("/")) {
+  console.warn(
+    "VITE_API_URL is not set for production. Frontend will attempt relative /api/trpc which will fail when hosted on Netlify. Set VITE_API_URL to your backend full URL."
+  );
+}
 
 const trpcClient = trpc.createClient({
+  transformer: superjson,
   links: [
     httpBatchLink({
       url: apiUrl,
-      transformer: superjson,
-        // Include credentials so cookie-based sessions work (Set-Cookie / HttpOnly)
-        fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
-        headers: async () => {
+      // Include credentials so cookie-based sessions work (Set-Cookie / HttpOnly)
+      fetch: (input, init) => fetch(input, { ...init, credentials: "include" }),
+      headers: async () => {
+        try {
           const currentUser = firebaseAuth.currentUser;
+          console.debug("trpc header: firebase currentUser present?", !!currentUser);
           if (!currentUser) return {};
           const token = await currentUser.getIdToken();
           return { authorization: `Bearer ${token}` };
-        },
+        } catch (err) {
+          console.warn("Failed to build auth headers for trpc:", err);
+          return {};
+        }
+      },
     }),
   ],
 });

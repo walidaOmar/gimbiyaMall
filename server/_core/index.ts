@@ -30,15 +30,34 @@ async function startServer() {
   await connectDB();
 
   const app = express();
+  // Ensure proxy headers (x-forwarded-*) are trusted in hosted environments
+  app.set("trust proxy", true);
   const server = createServer(app);
 
   // 2. Configure CORS for production deployment
-  const corsOrigin = process.env.CORS_ORIGIN || "https://gimbiyamall.netlify.app";
+  // Allow a comma-separated list of origins in CORS_ORIGIN, or default to localhost + Netlify.
+  let corsOriginEnv = process.env.CORS_ORIGIN || "https://gimbiyamall.netlify.app";
+  // In development, always add localhost ports for local testing
+  if (process.env.NODE_ENV !== "production") {
+    corsOriginEnv = [corsOriginEnv, "http://localhost:3000", "http://localhost:3001"].join(",");
+  }
+  const allowedOrigins = corsOriginEnv.split(",").map((s) => s.trim()).filter(Boolean);
+
   const corsOptions = {
-    origin: corsOrigin,
+    origin: (origin: any, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (e.g., server-to-server, curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      // For debugging, log blocked origins in non-production
+      if (process.env.NODE_ENV !== "production") console.warn("Blocked CORS origin:", origin);
+      return callback(new Error("CORS origin not allowed"));
+    },
     credentials: true,
     optionsSuccessStatus: 200,
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   };
+
   app.use(cors(corsOptions));
 
   // 3. Rate limiting: stricter on auth, general on all API

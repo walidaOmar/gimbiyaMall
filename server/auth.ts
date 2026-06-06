@@ -252,6 +252,34 @@ export const authRouter = router({
     }),
 
   /**
+   * auth.loginUnified
+   * Unified email/password login for buyers and staff. Verifies local password
+   * and issues the session cookie. This lets the frontend present a single
+   * sign-in form for all users.
+   */
+  loginUnified: publicProcedure
+    .input(
+      z.object({ email: z.string().email("Invalid email address"), password: z.string().min(1, "Password is required") })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const user = await User.findOne({ email: input.email.toLowerCase().trim() }).select("+passwordHash");
+      if (!user) throw new Error("Invalid email or password.");
+      if (!user.isActive) throw new Error("Account deactivated. Please contact the administrator.");
+
+      const isValid = await user.comparePassword(input.password);
+      if (!isValid) throw new Error("Invalid email or password.");
+
+      // Update last sign-in in background
+      User.findByIdAndUpdate(user._id, { lastSignedIn: new Date() }).exec();
+
+      // Set JWT cookie
+      const token = await createSessionToken(user);
+      ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions(ctx.req));
+
+      return { success: true, message: `Signed in as ${user.role}`, role: user.role };
+    }),
+
+  /**
    * auth.loginStaff
    * For admin, manager, stock_manager, delivery, and developer roles.
    * Staff accounts are seeded into MongoDB at startup via mongodb.ts.

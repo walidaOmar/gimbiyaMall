@@ -125,13 +125,30 @@ export const appRouter = router({
 
   // ── STORES ──────────────────────────────────────────────────────────────────
   stores: router({
+    // Simple in-memory cache to reduce DB load and avoid browser timeouts
     list: publicProcedure
       .input(paginationInput)
       .query(async ({ input }) => {
+        const CACHE_TTL = 30 * 1000; // 30s cache
+        // Cache key per offset/limit for simple pagination caching
+        const cacheKey = `${input.limit}:${input.offset}`;
+        // Lazy-initialize cache storage on module
+        (global as any)._gimbiya_store_cache = (global as any)._gimbiya_store_cache || { data: {}, ts: {} };
+        const cache = (global as any)._gimbiya_store_cache;
+
+        const now = Date.now();
+        if (cache.data[cacheKey] && now - (cache.ts[cacheKey] || 0) < CACHE_TTL) {
+          console.log(`stores.list: returning cached results for ${cacheKey}`);
+          return cache.data[cacheKey];
+        }
+
         const start = Date.now();
         const results = await Store.find({ isActive: true }).skip(input.offset).limit(input.limit).lean();
         const duration = Date.now() - start;
         console.log(`stores.list: returned ${results.length} stores in ${duration}ms`);
+
+        cache.data[cacheKey] = results;
+        cache.ts[cacheKey] = Date.now();
         return results;
       }),
     detail: publicProcedure

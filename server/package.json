@@ -1,9 +1,9 @@
 {
 	"dependencies": {
-		"@trpc/server": "^10.45.2",
+		"@trpc/server": "^11.16.0",
 		"express": "^4.19.2",
 		"dotenv": "^16.4.5",
-		"zod": "^3.23.8",
+		"zod": "^4.1.12",
 		"jose": "^5.6.3",
 		"bcryptjs": "^3.0.3",
 		"mongoose": "^9.3.0",
