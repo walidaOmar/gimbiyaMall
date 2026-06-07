@@ -59,9 +59,23 @@ const trpcClient = trpc.createClient({
         try {
           const currentUser = firebaseAuth.currentUser;
           console.debug("trpc header: firebase currentUser present?", !!currentUser);
-          if (!currentUser) return {};
+
+          // If a demo email is stored in localStorage (dev/demo mode), send it
+          // to the backend via a header so the server can return a mock session
+          // when the DB is offline. Key: `GIMBIYA_DEMO_EMAIL`.
+          let demoHeader: Record<string, string> = {};
+          try {
+            if (typeof window !== "undefined") {
+              const demoEmail = localStorage.getItem("GIMBIYA_DEMO_EMAIL");
+              if (demoEmail) demoHeader = { "x-demo-session-email": demoEmail };
+            }
+          } catch (e) {
+            /* ignore localStorage failures */
+          }
+
+          if (!currentUser) return demoHeader;
           const token = await currentUser.getIdToken();
-          return { authorization: `Bearer ${token}` };
+          return { authorization: `Bearer ${token}`, ...demoHeader };
         } catch (err) {
           console.warn("Failed to build auth headers for trpc:", err);
           return {};

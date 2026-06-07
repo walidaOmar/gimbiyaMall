@@ -26,6 +26,27 @@ import { signOut } from "firebase/auth";
 import { trpc } from "@/lib/trpc";
 import { firebaseAuth } from "@/lib/firebase";
 
+const DEMO_SESSION_STORAGE_KEY = "gimbiyaMallDemoSession";
+
+function readDemoSession(): AuthUser | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DEMO_SESSION_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDemoSession(user: AuthUser | null) {
+  if (typeof window === "undefined") return;
+  if (user) {
+    window.localStorage.setItem(DEMO_SESSION_STORAGE_KEY, JSON.stringify(user));
+  } else {
+    window.localStorage.removeItem(DEMO_SESSION_STORAGE_KEY);
+  }
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type AuthUser = {
@@ -56,6 +77,7 @@ export type AuthContextValue = {
   clearUser: () => void;
   /** @deprecated Use refetchUser() after login instead */
   setUser: (user: AuthUser) => void;
+  demoLogin: (user: AuthUser) => void;
   logout: () => Promise<void>;
 };
 
@@ -89,6 +111,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
 
     if (authMe.error) {
+      const demoSession = readDemoSession();
+      if (demoSession) {
+        setUserState(demoSession);
+        setError(null);
+        return;
+      }
+
       setError(authMe.error);
       setUserState(null);
       return;
@@ -110,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── clearUser — call after logout ────────────────────────────────────────
   const clearUser = useCallback(() => {
+    saveDemoSession(null);
     setUserState(null);
   }, []);
 
@@ -135,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── logout ────────────────────────────────────────────────────────────────
   const logout = useCallback(async () => {
+    saveDemoSession(null);
     setUserState(null);
     try {
       await logoutMutation.mutateAsync();
@@ -149,6 +180,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = "/";
   }, [logoutMutation]);
 
+  const demoLogin = useCallback((demoUser: AuthUser) => {
+    saveDemoSession(demoUser);
+    setUserState(demoUser);
+    setError(null);
+    setLoading(false);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -159,8 +197,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearUser,
       setUser,
       logout,
+      demoLogin,
     }),
-    [user, loading, error, refetchUser, clearUser, setUser, logout]
+    [user, loading, error, refetchUser, clearUser, setUser, logout, demoLogin]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

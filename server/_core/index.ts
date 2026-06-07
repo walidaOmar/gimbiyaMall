@@ -34,45 +34,64 @@ async function startServer() {
   app.set("trust proxy", true);
   const server = createServer(app);
 
-  // 2. Configure CORS for production deployment
-  // Allow a comma-separated list of origins in CORS_ORIGIN, or default to localhost + Netlify.
-  let corsOriginEnv = process.env.CORS_ORIGIN || "https://gimbiyamall.netlify.app";
-  // In development, always add localhost ports for local testing
-  if (process.env.NODE_ENV !== "production") {
-    corsOriginEnv = [corsOriginEnv, "http://localhost:3000", "http://localhost:3001"].join(",");
-  }
-  const allowedOrigins = corsOriginEnv.split(",").map((s) => s.trim()).filter(Boolean);
+  // 2. Body parsing middleware — do this first
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // 3. Configure CORS for production deployment
+  // In development allow all origins (useful for localhost, Codespaces, etc.).
+  // In production, restrict origins to `CORS_ORIGIN` (or the Netlify default).
+  const isProd = process.env.NODE_ENV === "production";
+  const netlifyDefault = "https://gimbiyamall.netlify.app";
+  const corsOriginEnv = process.env.CORS_ORIGIN || netlifyDefault;
+
+  console.log(`[CORS] Environment: ${isProd ? "PRODUCTION" : "DEVELOPMENT"}`);
+  console.log(`[CORS] Allowed origin(s): ${corsOriginEnv}`);
 
   const corsOptions = {
     origin: (origin: any, callback: (err: Error | null, allow?: boolean) => void) => {
       // Allow requests with no origin (e.g., server-to-server, curl)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      // For debugging, log blocked origins in non-production
-      if (process.env.NODE_ENV !== "production") console.warn("Blocked CORS origin:", origin);
+      if (!origin) {
+        console.log("[CORS] No origin detected (server-to-server or same-domain request) — ALLOWED");
+        return callback(null, true);
+      }
+
+      // In development, allow any origin to simplify local/Codespaces workflows.
+      if (!isProd) {
+        console.log(`[CORS] Development mode — allowing origin: ${origin}`);
+        return callback(null, true);
+      }
+
+      // In production, validate against configured origins (support comma list)
+      const allowedOrigins = corsOriginEnv.split(",").map((s) => s.trim()).filter(Boolean);
+      if (allowedOrigins.includes(origin)) {
+        console.log(`[CORS] Production origin allowed: ${origin}`);
+        return callback(null, true);
+      }
+      console.warn(`[CORS] ❌ BLOCKED origin: ${origin} (allowed: ${allowedOrigins.join(", ")})`);
       return callback(new Error("CORS origin not allowed"));
     },
     credentials: true,
     optionsSuccessStatus: 200,
-    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With", "X-TRPC-Source"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    maxAge: 86400, // 24 hours — reduces preflight spam
   };
 
   app.use(cors(corsOptions));
 
-  // 3. Rate limiting: stricter on auth, general on all API
+  // 4. Explicitly handle preflight (OPTIONS) requests on ALL routes
+  app.options("*", cors(corsOptions));
+
+  // 5. Rate limiting: stricter on auth, general on all API
   app.use("/api/trpc/auth", authRateLimiter);
   app.use("/api/trpc", apiRateLimiter);
 
-  // 4. tRPC router — all API handled here, no separate OAuth routes
+  // 6. tRPC router — all API handled here, no separate OAuth routes
   app.use(
     "/api/trpc",
     createExpressMiddleware({ router: appRouter, createContext })
   );
-
-  // 5. Other routes can still use express body parsing if needed
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // 6. Frontend (Vite dev or static build)
   if (process.env.NODE_ENV === "development") {

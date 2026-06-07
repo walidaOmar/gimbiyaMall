@@ -11,10 +11,26 @@ export const COOKIE_NAME = "gimbiya_session";
 const ONE_YEAR_MS = 1000 * 60 * 60 * 24 * 365;
 
 function getSecretKey(): Uint8Array {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("JWT_SECRET must be at least 32 characters long");
+  let secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("⚠️ Warning: JWT_SECRET is not set. Using dev fallback.");
+      secret = "development_fallback_secret_32_characters_min";
+    } else {
+      throw new Error("JWT_SECRET must be set in production");
+    }
   }
+
+  if (secret.length < 32) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("⚠️ Warning: JWT_SECRET is shorter than 32 chars; padding for dev.");
+      secret = secret.padEnd(32, "0");
+    } else {
+      throw new Error("JWT_SECRET must be at least 32 characters long in production");
+    }
+  }
+
   return new TextEncoder().encode(secret);
 }
 

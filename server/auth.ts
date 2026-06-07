@@ -56,7 +56,43 @@ export const authRouter = router({
    * name, email, role, isAffiliate, _id — not just the mutation response.
    */
   me: publicProcedure.query(async ({ ctx }) => {
-    if (!ctx.user) return null;
+    if (!ctx.user) {
+      // Dev demo-mode fallback: when MongoDB is offline and we're in non-prod,
+      // allow the frontend to request a stable demo session by sending
+      // `x-demo-session-email` header (value: email). This enables offline
+      // demos for Manager/Admin dashboards without a live DB.
+      try {
+        const { getIsConnected } = await import("./mongodb");
+        if (!getIsConnected() && process.env.NODE_ENV !== "production") {
+          const raw = ctx.req.headers["x-demo-session-email"] || ctx.req.headers["x-demo-session"];
+          const demoEmail = Array.isArray(raw) ? raw[0] : raw;
+          if (typeof demoEmail === "string" && demoEmail.length > 0) {
+            const userObj = {
+              _id:          "000000000000000000000000",
+              name:         "Demo Admin",
+              email:        demoEmail,
+              role:         "admin",
+              phone:        null,
+              profileImage: null,
+              address:      null,
+              city:         null,
+              state:        null,
+              country:      "Nigeria",
+              isActive:     true,
+              isAffiliate:  false,
+              createdAt:    new Date().toISOString(),
+              updatedAt:    new Date().toISOString(),
+            };
+            console.log(`[Auth Demo] returning demo user ${demoEmail} because DB offline`);
+            return userObj;
+          }
+        }
+      } catch (err) {
+        console.warn("Auth demo fallback check failed:", err);
+      }
+
+      return null;
+    }
 
     const start = Date.now();
     // Return safe user object (passwordHash is select:false, so not included)

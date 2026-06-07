@@ -20,6 +20,8 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import { seedVirtualMall } from "./seedVirtualMall";
 
+mongoose.set("bufferCommands", false);
+
 let isConnected = false;
 
 export async function connectDB(): Promise<void> {

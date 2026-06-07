@@ -66,7 +66,7 @@ const lbl: React.CSSProperties = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Auth() {
-  const { user, loading, setUser } = useAuth();
+  const { user, loading, setUser, demoLogin } = useAuth();
   const [, navigate] = useLocation();
   const search = useSearch();
   const urlMode = new URLSearchParams(search).get("mode");
@@ -92,7 +92,36 @@ export default function Auth() {
   const [signupConfirm, setSignupConfirm] = useState("");
   const [showSignupPw, setShowSignupPw]   = useState(false);
 
-  
+  const isDevDemoMode = import.meta.env.DEV ||
+    (typeof window !== "undefined" && window.location.hostname.includes("localhost"));
+
+  const demoUsers = {
+    admin: {
+      _id: "demo-admin",
+      name: "Demo Admin",
+      email: "admin@sahadstores.com",
+      role: "admin",
+      phone: "+2340000000000",
+      isAffiliate: false,
+      isActive: true,
+    },
+    manager: {
+      _id: "demo-manager",
+      name: "Demo Manager",
+      email: "manager@sahadstores.com",
+      role: "manager",
+      phone: "+2340000000001",
+      isAffiliate: false,
+      isActive: true,
+    },
+  } as const;
+
+  const handleDemoSignIn = (role: keyof typeof demoUsers) => {
+    const demoUser = demoUsers[role];
+    demoLogin(demoUser as any);
+    toast.success(`Demo ${role === "admin" ? "Admin" : "Manager"} active.`);
+    navigate(getRoleRedirect(demoUser.role));
+  };
 
   // ── tRPC mutations ──────────────────────────────────────────────────────────
 
@@ -430,6 +459,46 @@ export default function Auth() {
                   {firebaseLogin.isPending ? "Signing in…" : "Sign In"}
                 </button>
               </form>
+
+              {isDevDemoMode && (
+                <div style={{ marginTop: 20, textAlign: "center" }}>
+                  <p style={{ color: "rgba(255,255,255,0.5)", marginBottom: 12 }}>
+                    Demo mode: sign in locally without a live MongoDB backend.
+                  </p>
+                  <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDemoSignIn("admin")}
+                      style={{
+                        padding: "11px 14px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        background: "rgba(255,255,255,0.08)",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Demo Admin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDemoSignIn("manager")}
+                      style={{
+                        padding: "11px 14px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        background: "rgba(255,255,255,0.08)",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Demo Manager
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <p
                 style={{
