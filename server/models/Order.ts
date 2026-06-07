@@ -89,6 +89,5 @@ const orderSchema = new Schema<IOrder>(
 orderSchema.index({ buyerId: 1, createdAt: -1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ deliveryRiderId: 1 });
-orderSchema.index({ orderId: 1 });
 
 export const Order = mongoose.model<IOrder>("Order", orderSchema);
