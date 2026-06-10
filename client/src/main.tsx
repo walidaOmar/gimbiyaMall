@@ -42,10 +42,11 @@ const apiUrl =
   deriveCodespaceApiUrl() ||
   "/api/trpc";
 
-if (import.meta.env.PROD && apiUrl.startsWith("/")) {
-  console.warn(
-    "VITE_API_URL is not set for production. Frontend will attempt relative /api/trpc which will fail when hosted on Netlify. Set VITE_API_URL to your backend full URL."
-  );
+// In production we expect a relative URL (`/api/trpc`) so requests go through
+// the Netlify proxy. Only warn when the value looks malformed (neither
+// relative nor absolute http(s)).
+if (import.meta.env.PROD && !apiUrl.startsWith("/") && !apiUrl.startsWith("http")) {
+  console.warn("VITE_API_URL looks misconfigured:", apiUrl);
 }
 
 const trpcClient = trpc.createClient({

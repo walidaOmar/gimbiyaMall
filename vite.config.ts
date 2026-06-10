@@ -47,7 +47,8 @@ export default defineConfig({
   // Vite's root is the client folder (index.html lives there)
   root:      path.resolve(__dirname, "client"),
   publicDir: path.resolve(__dirname, "client/public"),
-  envDir:    path.resolve(__dirname),           // .env lives at project root
+  // Load .env files from the client folder so client/.env.production is used
+  envDir:    path.resolve(__dirname, "client"),
 
   build: {
     outDir:      "dist/public",

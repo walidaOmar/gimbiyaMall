@@ -124,7 +124,9 @@ export const authRouter = router({
    * invalidation and cache clearing works properly.
    */
   logout: publicProcedure.mutation(({ ctx }) => {
-    ctx.res.clearCookie(COOKIE_NAME, { path: "/" });
+    // Clear cookie using the same options used to set it so browsers
+    // actually remove the cookie (especially SameSite=None; Secure).
+    ctx.res.clearCookie(COOKIE_NAME, getSessionCookieOptions(ctx.req));
     return { success: true } as const;
   }),
 
