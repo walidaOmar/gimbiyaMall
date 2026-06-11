@@ -1,16 +1,21 @@
 [build]
-  base = "client"
+  # Build from repo root so Vite and the server esbuild step run together
   command = "pnpm install && pnpm build"
   publish = "dist/public"
 
-# API proxy rule - forward /api/* requests to Railway backend
+# API proxy — MUST come before the /* catch-all. `force = true` ensures
+# Netlify forwards the request even if a local file exists.
 [[redirects]]
-  from = "/api/*"
-  to = "https://gimbiya-mall-backend-production.up.railway.app/api/:splat"
+  from   = "/api/*"
+  to     = "https://gimbiya-mall-backend-production.up.railway.app/api/:splat"
   status = 200
+  force  = true
 
-# Frontend fallback rule - serve index.html for all other routes
+  [redirects.headers]
+    X-Forwarded-Host = ":splat"
+
+# SPA fallback — all non-file routes serve index.html
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from   = "/*"
+  to     = "/index.html"
   status = 200

@@ -2,10 +2,11 @@ services:
   - type: web
     name: gimbiya-mall-backend
     env: node
-    plan: standard
-    rootDir: server
-    buildCommand: pnpm install && pnpm build
-    startCommand: pnpm start
+    plan: starter
+    # Build runs from the repository root so pnpm can resolve the workspace
+    # lockfile and the root tsconfig. The compiled server lands in dist/index.js.
+    buildCommand: pnpm install && pnpm build:server
+    startCommand: node dist/index.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -17,8 +18,6 @@ services:
         sync: false
       - key: PORT
         value: 3000
-      - key: DATABASE_URL
-        sync: false
       - key: CORS_ORIGIN
-        sync: false
-    healthCheckPath: /
+        value: https://gimbiyamall.netlify.app
+    healthCheckPath: /api/trpc/auth.me
